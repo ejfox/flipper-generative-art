@@ -16,7 +16,7 @@ typedef struct {
     float frequency;
     float noise_scale;
     bool invert;
-    uint8_t frame_count;
+    uint32_t frame_count;
 } GenerativeState;
 
 typedef struct {
@@ -25,10 +25,13 @@ typedef struct {
     FuriTimer* timer;
     GenerativeState* state;
     NotificationApp* notifications;
+    FuriMessageQueue* event_queue;
+    bool running;
 } FlipperGenApp;
 
 // Lightweight pseudo-random number generator
 static uint32_t xorshift32(uint32_t* state) {
+    if(*state == 0) *state = 1; // Prevent zero-lock
     *state ^= *state << 13;
     *state ^= *state >> 17;
     *state ^= *state << 5;
@@ -225,38 +228,11 @@ static void draw_callback(Canvas* canvas, void* context) {
     canvas_draw_str(canvas, 1, 8, info);
 }
 
-// Input callback
+// Input callback - enqueue events for main loop
 static void input_callback(InputEvent* input_event, void* context) {
-    FlipperGenApp* app = (FlipperGenApp*)context;
-    
-    if(input_event->type == InputTypePress) {
-        switch(input_event->key) {
-            case InputKeyOk:
-                // Generate new pattern
-                app->state->seed = furi_get_tick();
-                app->state->gradient_type = app->state->seed % 10;
-                app->state->frequency = 0.5f + (float)(app->state->seed % 100) / 50.0f;
-                break;
-            case InputKeyUp:
-                app->state->gradient_type = (app->state->gradient_type + 1) % 10;
-                break;
-            case InputKeyDown:
-                app->state->gradient_type = (app->state->gradient_type + 9) % 10;
-                break;
-            case InputKeyLeft:
-                app->state->frequency = fmaxf(0.1f, app->state->frequency - 0.1f);
-                break;
-            case InputKeyRight:
-                app->state->frequency = fminf(4.0f, app->state->frequency + 0.1f);
-                break;
-            case InputKeyBack:
-                // Exit handled by scene manager
-                break;
-            case InputKeyMAX:
-                // Handle enum max value - do nothing
-                break;
-        }
-    }
+    furi_assert(context);
+    FuriMessageQueue* event_queue = context;
+    furi_message_queue_put(event_queue, input_event, FuriWaitForever);
 }
 
 // Timer callback for animation
@@ -269,8 +245,11 @@ static void timer_callback(void* context) {
 // App lifecycle
 FlipperGenApp* flipper_gen_app_alloc() {
     FlipperGenApp* app = malloc(sizeof(FlipperGenApp));
-    
+    furi_check(app != NULL);
+
     app->state = malloc(sizeof(GenerativeState));
+    furi_check(app->state != NULL);
+    memset(app->state, 0, sizeof(GenerativeState));
     app->state->seed = furi_get_tick();
     app->state->mode = 0;
     app->state->gradient_type = 0;
@@ -282,9 +261,12 @@ FlipperGenApp* flipper_gen_app_alloc() {
     app->gui = furi_record_open(RECORD_GUI);
     app->notifications = furi_record_open(RECORD_NOTIFICATION);
     
+    app->event_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
+    app->running = true;
+
     app->view_port = view_port_alloc();
     view_port_draw_callback_set(app->view_port, draw_callback, app->state);
-    view_port_input_callback_set(app->view_port, input_callback, app);
+    view_port_input_callback_set(app->view_port, input_callback, app->event_queue);
     
     gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
     
@@ -300,13 +282,14 @@ FlipperGenApp* flipper_gen_app_alloc() {
 void flipper_gen_app_free(FlipperGenApp* app) {
     furi_timer_stop(app->timer);
     furi_timer_free(app->timer);
-    
+
     gui_remove_view_port(app->gui, app->view_port);
     view_port_free(app->view_port);
-    
+    furi_message_queue_free(app->event_queue);
+
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);
-    
+
     free(app->state);
     free(app);
 }
@@ -319,14 +302,41 @@ int32_t flipper_gen_app(void* p) {
     notification_message(app->notifications, &sequence_display_backlight_on);
     
     view_port_update(app->view_port);
-    
-    // Wait for user to exit
-    while(true) {
-        furi_delay_ms(100);
-        // In a real app, you'd check for exit conditions here
+
+    // Main event loop
+    InputEvent event;
+    while(app->running) {
+        if(furi_message_queue_get(app->event_queue, &event, 100) == FuriStatusOk) {
+            if(event.type == InputTypePress) {
+                switch(event.key) {
+                    case InputKeyOk:
+                        app->state->seed = furi_get_tick();
+                        app->state->gradient_type = app->state->seed % 10;
+                        app->state->frequency = 0.5f + (float)(app->state->seed % 100) / 50.0f;
+                        break;
+                    case InputKeyUp:
+                        app->state->gradient_type = (app->state->gradient_type + 1) % 10;
+                        break;
+                    case InputKeyDown:
+                        app->state->gradient_type = (app->state->gradient_type + 9) % 10;
+                        break;
+                    case InputKeyLeft:
+                        app->state->frequency = fmaxf(0.1f, app->state->frequency - 0.1f);
+                        break;
+                    case InputKeyRight:
+                        app->state->frequency = fminf(4.0f, app->state->frequency + 0.1f);
+                        break;
+                    case InputKeyBack:
+                        app->running = false;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
     }
-    
+
     flipper_gen_app_free(app);
-    
+
     return 0;
 }
