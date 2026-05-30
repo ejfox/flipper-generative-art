@@ -1,6 +1,6 @@
 # Flipper Zero Generative Art
 
-Real-time generative art and animated patterns for the Flipper Zero's 128x64 monochrome display. Uses Floyd-Steinberg dithering to produce smooth, evolving visuals at 30 FPS.
+Real-time generative art engine for the Flipper Zero's 128x64 monochrome display. Fractals, demoscene effects, layer blending, and multiple dithering algorithms at 30 FPS.
 
 ## Gallery
 
@@ -14,23 +14,67 @@ Real-time generative art and animated patterns for the Flipper Zero's 128x64 mon
 
 </div>
 
-## Features
+## Patterns
 
-- **10 pattern types** -- horizontal, vertical, radial, diagonal, sine, cosine, interference, checkerboard, noise, spiral
-- **Real-time animation** at 30 FPS with auto-evolving parameters
-- **Floyd-Steinberg dithering** for high-quality 1-bit rendering
-- **Interactive controls** for live pattern and frequency adjustment
-- **Built-in help screen**
+**Classic**
+- Horizontal, Vertical, Radial, Diagonal
+- Sine Wave, Cosine Wave, Interference, Checkerboard
+- Noise, Spiral
+
+**Fractal / Hacker**
+- Mandelbrot -- infinite zoom into Seahorse Valley
+- Julia Set -- animated orbiting c parameter
+- Plasma -- classic demoscene sum-of-sines
+- Perlin Noise -- multi-octave with animation
+- Moire -- drifting concentric ring interference
+- Sierpinski -- XOR fractal with scroll
+
+## Layer Blending
+
+Overlay any two patterns with a blend mode:
+
+| Mode | Effect |
+|------|--------|
+| XOR | Bitwise XOR -- glitchy, digital |
+| AND | Bitwise AND -- intersection |
+| OR | Bitwise OR -- union |
+| Add | Additive (clamped) -- brightens |
+| Multiply | Darkens overlapping areas |
+| Diff | Absolute difference -- edges |
+| Screen | Inverse multiply -- lightens |
+
+## Dithering
+
+| Algorithm | Character |
+|-----------|-----------|
+| Floyd-Steinberg | Smooth gradients, classic error diffusion |
+| Bayer 4x4 | Ordered halftone, newspaper print feel |
+| Atkinson | High contrast, old Mac aesthetic |
+| Threshold | Hard black/white, no dithering |
 
 ## Controls
 
+### Config Screen
+
+Use Left/Right to cycle through options. Press OK on any item to launch the canvas.
+
+| Setting | Options |
+|---------|---------|
+| Pattern | All 16 patterns |
+| Layer | None, or any pattern as overlay |
+| Blend | None, XOR, AND, OR, Add, Multiply, Diff, Screen |
+| Dither | Floyd-Steinberg, Bayer 4x4, Atkinson, Threshold |
+| Auto-evolve | Off / On |
+
+### Canvas
+
 | Button | Action |
 |--------|--------|
-| OK | Generate new random pattern |
-| Up / Down | Change gradient type |
-| Left / Right | Adjust frequency / animation speed |
-| Back | Show help screen |
-| Back (hold) | Exit |
+| Up / Down | Cycle pattern |
+| Left / Right | Adjust frequency (hold to repeat) |
+| OK | Randomize seed and frequency |
+| OK (hold) | Toggle invert |
+| Back | Return to config |
 
 ## Installation
 
@@ -100,9 +144,11 @@ flipper-generative-art/
 ## Technical Details
 
 - **Display**: 128x64 monochrome LCD
-- **Rendering**: Floyd-Steinberg error-diffusion dithering
-- **Frame rate**: ~30 FPS real-time
-- **Memory**: Minimal footprint, single-file application
+- **Patterns**: 16 generative algorithms (gradients, fractals, noise, demoscene)
+- **Blending**: 7 compositing modes for layering two patterns
+- **Dithering**: 4 algorithms (Floyd-Steinberg, Bayer, Atkinson, Threshold)
+- **Frame rate**: ~30 FPS real-time (pattern dependent)
+- **Memory**: Single-file app, minimal footprint
 
 ## License
 
